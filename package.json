@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "start": "rm -rf tmp && node index"
+    "start": "node index"
   },
   "author": "Lukas Milieška",
   "dependencies": {

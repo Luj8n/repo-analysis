@@ -1,4 +1,5 @@
 import { simpleGit } from "simple-git";
+import fs from "fs";
 
 const args = process.argv.slice(2);
 
@@ -11,11 +12,16 @@ if (!repository) {
   process.exit(1);
 }
 
+function deleteTmp() {
+  fs.rmSync("tmp", { recursive: true, force: true });
+}
+
 console.log(`Downloading '${repository}'...`);
 try {
+  deleteTmp();
   await simpleGit().clone(repository, "tmp");
 } catch (e) {
-  console.error(`Could not download '${repository}'`);
+  console.error(`Could not download '${repository}': ${e}`);
   process.exit(1);
 }
 console.log("Download done");
@@ -95,3 +101,5 @@ for (const file in fileData) {
 }
 
 console.log(authors);
+
+deleteTmp();
