@@ -8,7 +8,7 @@ import fs from "fs";
  * Main function to analyze git repository history.
  * @returns {Promise<void>} A Promise that resolves when the analysis is complete.
  */
-async function main() {
+async function main(): Promise<void> {
   // Define command line options using commander
   program
     .requiredOption(
