@@ -4,7 +4,10 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "start": "node index"
+    "start": "rm -rf tmp && node index"
   },
-  "author": "Lukas Milieška"
+  "author": "Lukas Milieška",
+  "dependencies": {
+    "simple-git": "^3.24.0"
+  }
 }
