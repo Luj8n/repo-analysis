@@ -4,7 +4,12 @@ import { simpleGit } from "simple-git";
 import { program } from "commander";
 import fs from "fs";
 
+/**
+ * Main function to analyze git repository history.
+ * @returns {Promise<void>} A Promise that resolves when the analysis is complete.
+ */
 async function main() {
+  // Define command line options using commander
   program
     .requiredOption(
       "-r, --repository <REPOSITORY>",
@@ -18,40 +23,59 @@ async function main() {
     );
 
   program.parse();
+
   const options = program.opts();
 
   const repository = options.repository;
   const threshold = options.threshold;
 
   try {
+    // Cleanup any previous temporary files
     cleanup();
+
     await downloadRepository(repository);
   } catch (e) {
     console.error(`Could not download '${repository}': ${e}`);
     process.exit(1);
   }
 
+  // Retrieve commit history from the downloaded repository
   const commits = await getCommits();
 
+  // Process commits to extract file data and authors
   const { fileData, authors } = processCommits(commits);
 
+  // Process file data (handle renames)
   processData(fileData);
 
+  // Analyze the processed data to identify similarities between authors
   analyzeData(fileData, authors, threshold);
 
+  // Cleanup temporary files
   cleanup();
 }
 
-async function downloadRepository(repository: string) {
+/**
+ * Function to download a git repository.
+ * @param {string} repository - Link to the git repository.
+ * @returns {Promise<void>} A Promise that resolves when the repository is downloaded.
+ */
+async function downloadRepository(repository: string): Promise<void> {
   console.log(`Downloading '${repository}'...`);
   await simpleGit().clone(repository, "./tmp");
 }
 
+/**
+ * Function to cleanup temporary files.
+ */
 function cleanup() {
   fs.rmSync("./tmp", { recursive: true, force: true });
 }
-
-async function getCommits() {
+/**
+ * Function to get commit history from the downloaded repository.
+ * @returns {Promise<LogResult<DefaultLogFields>>} A Promise that resolves with the commit history.
+ */
+async function getCommits(): Promise<LogResult<DefaultLogFields>> {
   console.log("Getting commits...");
   const git = simpleGit({ baseDir: "./tmp" });
   const commits = await git.log([
@@ -61,6 +85,9 @@ async function getCommits() {
   return commits;
 }
 
+/**
+ * Interface to represent file data extracted from commits.
+ */
 interface FileData {
   [file: string]: {
     author: string;
@@ -69,11 +96,19 @@ interface FileData {
   }[];
 }
 
-function processCommits(commits: LogResult<DefaultLogFields>) {
+/**
+ * Function to process commits and extract file data and authors.
+ * @param {LogResult<DefaultLogFields>} commits - The commit history to process.
+ * @returns {{fileData: FileData, authors: string[]}} An object containing file data and authors.
+ */
+function processCommits(commits: LogResult<DefaultLogFields>): {
+  fileData: FileData;
+  authors: string[];
+} {
   const fileData: FileData = {};
-
   const authors: string[] = [];
 
+  // Iterate over each commit and process its changes
   for (const commit of commits.all) {
     if (!commit.diff) continue;
     for (const fileDiff of commit.diff.files) {
@@ -92,12 +127,17 @@ function processCommits(commits: LogResult<DefaultLogFields>) {
   return { fileData, authors };
 }
 
+/**
+ * Function to process file data (handle renames).
+ * @param {FileData} fileData - The file data to process.
+ */
 function processData(fileData: FileData) {
   console.log("Processing data...");
 
   const renames = [];
 
   for (const file in fileData) {
+    // Regular expression to match renames with curly braces
     const regex1 = /{(.*?) => (.*?)}/g;
     if (file.match(regex1)) {
       const from = file.replace(regex1, "$1").replace(/\/\//g, "/");
@@ -110,6 +150,7 @@ function processData(fileData: FileData) {
       continue;
     }
 
+    // Regular expression to match simple renames
     const regex2 = /^(.*?) => (.*?)$/g;
     if (file.match(regex2)) {
       const from = file.replace(regex2, "$1");
@@ -122,13 +163,14 @@ function processData(fileData: FileData) {
     }
   }
 
+  // Reverse the order of rename operations to make it faster
   renames.reverse();
 
   while (true) {
     let modified = false;
 
     for (const rename of renames) {
-      // If the 'from' or 'to' files doesn't have commits then ignore it
+      // If the 'from' or 'to' files don't have commits then ignore it
       if (
         !fileData[rename.from] ||
         fileData[rename.from].length == 0 ||
@@ -145,38 +187,49 @@ function processData(fileData: FileData) {
     if (!modified) break;
   }
 
+  // Remove empty entries from fileData
   for (const file in fileData) {
     if (fileData[file].length == 0) delete fileData[file];
   }
 }
 
+/**
+ * Function to analyze data and identify similarities between authors.
+ * @param {FileData} fileData - The file data extracted from commits.
+ * @param {string[]} authors - The list of authors.
+ * @param {number} threshold - The similarity threshold.
+ */
 function analyzeData(fileData: FileData, authors: string[], threshold: number) {
   console.log("Analyzing data...");
 
+  // Object to store developer data
   const developerData: {
     [author: string]: {
       [file: string]: number;
     };
   } = {};
 
+  // Initialize developer data object
   for (const developer of authors) {
     developerData[developer] = {};
   }
 
+  // Iterate over each file in fileData
   for (const file in fileData) {
     const commitData = fileData[file];
     for (const commit of commitData) {
-      // TODO: try other ways of calculating weight
-
+      // Calculate weight of each commit based on changes
       // const commitWeight = Math.sqrt(commit.diff.changes); // Similar if developers have worked on the same files and maybe more on others
-      const commitWeight = commit.diff.changes; // Similar if developers have worked on the same files and maybe a little on others
+      const commitWeight = commit.diff.changes;
       // const commitWeight = commit.diff.changes ** 2; // Similar if developers have worked a lot on the same files and almost nothing more
+
       if (commitWeight == 0) continue;
       if (!developerData[commit.author][file]) developerData[commit.author][file] = 0;
       developerData[commit.author][file] += commitWeight;
     }
   }
 
+  // Iterate over each pair of authors
   for (const a of authors) {
     let aWeightSum = Object.values(developerData[a]).reduce((a, c) => a + c, 0);
 
@@ -205,6 +258,7 @@ function analyzeData(fileData: FileData, authors: string[], threshold: number) {
       }
       const similarity = similarWeightSum / bothWeightSum;
 
+      // Output similarity between authors if above threshold
       if (similarity > threshold) {
         console.log(`'${a}' and '${b}': similarity = ${Math.floor(similarity * 100)}%`);
       }
@@ -212,4 +266,5 @@ function analyzeData(fileData: FileData, authors: string[], threshold: number) {
   }
 }
 
+// Execute the main function
 await main();
