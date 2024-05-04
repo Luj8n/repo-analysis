@@ -1,3 +1,5 @@
+import type { DiffResultBinaryFile, DiffResultTextFile } from "simple-git";
+
 import { simpleGit } from "simple-git";
 import fs from "fs";
 
@@ -28,13 +30,20 @@ console.log("Download done");
 
 const git = simpleGit({ baseDir: "tmp" });
 
-const commits = await git.log({
-  "--numstat": true, // add commit statistics
-  "--no-merges": true, // ignore merge commits
-});
+const commits = await git.log([
+  "--numstat", // add commit statistics
+  "--no-merges", // ignore merge commits
+]);
 
-const fileData = {};
-const authors = [];
+const fileData: {
+  [key: string]: {
+    author: string;
+    date: string;
+    diff: DiffResultTextFile | DiffResultBinaryFile;
+  }[];
+} = {};
+
+const authors: string[] = [];
 
 for (const commit of commits.all) {
   if (!commit.diff) continue;
@@ -102,4 +111,19 @@ for (const file in fileData) {
 
 console.log(authors);
 
+const developerData: {
+  [key: string]: {
+    [key: string]: number;
+  };
+} = {};
+
+for (const developer of authors) {
+  developerData[developer] = {};
+}
+
+for (const file in fileData) {
+  const data = fileData[file];
+}
+
+// Cleanup
 deleteTmp();

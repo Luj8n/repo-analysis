@@ -2,12 +2,16 @@
   "name": "repo-analysis",
   "type": "module",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "./dist/index.js",
   "scripts": {
-    "start": "node index"
+    "start": "tsc && node ./dist/index.js"
   },
   "author": "Lukas Milieška",
   "dependencies": {
     "simple-git": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.12.8",
+    "typescript": "^5.4.5"
   }
 }
