@@ -1,29 +1,29 @@
 import type { DiffResultTextFile } from "simple-git";
 
 import { simpleGit } from "simple-git";
+import { program } from "commander";
 import fs from "fs";
 
-const args = process.argv.slice(2);
+program
+  .requiredOption("-r, --repository <REPOSITORY>", "link to the git repository. Example: https://github.com/Luj8n/oopp-team-25.git")
+  .option("-t, --threshold [THRESHOLD]", "specify threshold (from 0 to 1). Default = 0.6", parseFloat, 0.6)
 
-const repository = args[0];
+program.parse();
+const options = program.opts();
 
-if (!repository) {
-  console.error(
-    "Please provide a git repository link. Example: 'npm start https://github.com/Luj8n/oopp-team-25.git'"
-  );
-  process.exit(1);
-}
+const REPOSITORY = options.repository;
+const THRESHOLD = options.threshold;
 
 function deleteTmp() {
   fs.rmSync("./tmp", { recursive: true, force: true });
 }
 
-console.log(`Downloading '${repository}'...`);
+console.log(`Downloading '${REPOSITORY}'...`);
 try {
   deleteTmp();
-  await simpleGit().clone(repository, "./tmp");
+  await simpleGit().clone(REPOSITORY, "./tmp");
 } catch (e) {
-  console.error(`Could not download '${repository}': ${e}`);
+  console.error(`Could not download '${REPOSITORY}': ${e}`);
   process.exit(1);
 }
 console.log("Download done");
@@ -146,8 +146,8 @@ for (const a of authors) {
     let bWeightSum = Object.values(developerData[b]).reduce((a, c) => a + c, 0);
     const bothWeightSum = aWeightSum + bWeightSum;
 
-    // Ignore developers who didn't make many commits/changes
-    // if (bothWeightSum < 20) continue;
+    // Ignore developers who didn't make many changes
+    if (bothWeightSum < 100) continue;
 
     let similarWeightSum = 0;
     for (const file in developerData[a]) {
@@ -159,7 +159,7 @@ for (const a of authors) {
     }
     const similarity = similarWeightSum / bothWeightSum;
 
-    if (similarity > 0.6) {
+    if (similarity > THRESHOLD) {
       console.log(`'${a}' and '${b}': similarity = ${Math.floor(similarity * 100)}%`);
     }
   }
