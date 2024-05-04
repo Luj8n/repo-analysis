@@ -1,4 +1,4 @@
-import type { DiffResultBinaryFile, DiffResultTextFile } from "simple-git";
+import type { DiffResultTextFile } from "simple-git";
 
 import { simpleGit } from "simple-git";
 import fs from "fs";
@@ -15,20 +15,20 @@ if (!repository) {
 }
 
 function deleteTmp() {
-  fs.rmSync("tmp", { recursive: true, force: true });
+  fs.rmSync("./tmp", { recursive: true, force: true });
 }
 
 console.log(`Downloading '${repository}'...`);
 try {
   deleteTmp();
-  await simpleGit().clone(repository, "tmp");
+  await simpleGit().clone(repository, "./tmp");
 } catch (e) {
   console.error(`Could not download '${repository}': ${e}`);
   process.exit(1);
 }
 console.log("Download done");
 
-const git = simpleGit({ baseDir: "tmp" });
+const git = simpleGit({ baseDir: "./tmp" });
 
 const commits = await git.log([
   "--numstat", // add commit statistics
@@ -36,10 +36,10 @@ const commits = await git.log([
 ]);
 
 const fileData: {
-  [key: string]: {
+  [file: string]: {
     author: string;
     date: string;
-    diff: DiffResultTextFile | DiffResultBinaryFile;
+    diff: DiffResultTextFile;
   }[];
 } = {};
 
@@ -48,6 +48,7 @@ const authors: string[] = [];
 for (const commit of commits.all) {
   if (!commit.diff) continue;
   for (const fileDiff of commit.diff.files) {
+    if (fileDiff.binary) continue;
     if (fileData[fileDiff.file] == undefined) fileData[fileDiff.file] = [];
     fileData[fileDiff.file].push({ author: commit.author_name, date: commit.date, diff: fileDiff });
 
@@ -109,11 +110,11 @@ for (const file in fileData) {
   if (fileData[file].length == 0) delete fileData[file];
 }
 
-console.log(authors);
+console.log("Analyzing data...");
 
 const developerData: {
-  [key: string]: {
-    [key: string]: number;
+  [author: string]: {
+    [file: string]: number;
   };
 } = {};
 
@@ -122,7 +123,46 @@ for (const developer of authors) {
 }
 
 for (const file in fileData) {
-  const data = fileData[file];
+  const commitData = fileData[file];
+  for (const commit of commitData) {
+    // TODO: try other ways of calculating weight
+
+    // const commitWeight = Math.sqrt(commit.diff.changes); // Similar if developers have worked on the same files and maybe more on others
+    const commitWeight = commit.diff.changes; // Similar if developers have worked on the same files and maybe a little on others
+    // const commitWeight = commit.diff.changes ** 2; // Similar if developers have worked a lot on the same files and almost nothing more
+    if (commitWeight == 0) continue;
+    if (!developerData[commit.author][file]) developerData[commit.author][file] = 0;
+    developerData[commit.author][file] += commitWeight;
+  }
+}
+
+for (const a of authors) {
+  let aWeightSum = Object.values(developerData[a]).reduce((a, c) => a + c, 0);
+
+  for (const b of authors) {
+    // Don't look at pairs twice
+    if (a >= b) continue;
+
+    let bWeightSum = Object.values(developerData[b]).reduce((a, c) => a + c, 0);
+    const bothWeightSum = aWeightSum + bWeightSum;
+
+    // Ignore developers who didn't make many commits/changes
+    // if (bothWeightSum < 20) continue;
+
+    let similarWeightSum = 0;
+    for (const file in developerData[a]) {
+      const aWeight = developerData[a][file];
+      const bWeight = developerData[b][file] ?? 0;
+
+      if (bWeight == 0) continue; // A made changes but B did not
+      else similarWeightSum += aWeight + bWeight; // Both made changes
+    }
+    const similarity = similarWeightSum / bothWeightSum;
+
+    if (similarity > 0.6) {
+      console.log(`'${a}' and '${b}': similarity = ${Math.floor(similarity * 100)}%`);
+    }
+  }
 }
 
 // Cleanup
