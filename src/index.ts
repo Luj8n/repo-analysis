@@ -287,6 +287,7 @@ function analyzeTopContributors(fileData: FileData, commits: Commits, limit: num
       insertions: number;
       deletions: number;
       commits: number;
+      totalFilesModified: number;
     };
   } = {};
 
@@ -298,7 +299,7 @@ function analyzeTopContributors(fileData: FileData, commits: Commits, limit: num
 
       // Increment the changes made by the author
       if (!authorChanges[author])
-        authorChanges[author] = { insertions: 0, deletions: 0, commits: 0 };
+        authorChanges[author] = { insertions: 0, deletions: 0, commits: 0, totalFilesModified: 0 };
 
       authorChanges[author].insertions += commit.diff.insertions;
       authorChanges[author].deletions += commit.diff.deletions;
@@ -308,8 +309,10 @@ function analyzeTopContributors(fileData: FileData, commits: Commits, limit: num
   // Count commits of each author
   for (const commit of commits.all) {
     const author = commit.author_name;
-    if (!authorChanges[author]) authorChanges[author] = { insertions: 0, deletions: 0, commits: 0 };
+    if (!authorChanges[author])
+      authorChanges[author] = { insertions: 0, deletions: 0, commits: 0, totalFilesModified: 0 };
     authorChanges[author].commits += 1;
+    authorChanges[author].totalFilesModified += commit.diff?.files.length ?? 0;
   }
 
   // Sort authors by the total insertions in descending order
@@ -322,10 +325,11 @@ function analyzeTopContributors(fileData: FileData, commits: Commits, limit: num
   for (let i = 0; i < limit && i < sortedAuthors.length; i++) {
     const author = sortedAuthors[i];
     const contribution = authorChanges[author];
+    const averageFiles = (contribution.totalFilesModified / contribution.commits).toFixed(2);
     console.log(
       `${i + 1}. ${author}: ${contribution.insertions} insertions, ${
         contribution.deletions
-      } deletions, ${contribution.commits} commits`
+      } deletions, ${contribution.commits} commits, avg. files ${averageFiles}`
     );
   }
   console.log();
