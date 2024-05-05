@@ -40,6 +40,34 @@ Example:
 npm start -- -r https://github.com/Luj8n/oopp-team-25.git -t 0.55 -l 7
 ```
 
+Output:
+
+```
+Downloading 'https://github.com/Luj8n/oopp-team-25.git'...
+Getting commits...
+Processing data...
+Analyzing data...
+
+Similarities:
+'Lukas Milieška' and 'Sem van der Weijden': similarity = 55%
+'Sem van der Weijden' and 'Wing Wong': similarity = 63%
+'Eva Miesen' and 'Sem van der Weijden': similarity = 69%
+'Eva Miesen' and 'Wing Wong': similarity = 56%
+'Wing' and 'rensPols': similarity = 63%
+'OOP Project Team' and 'Sebastian Proksch': similarity = 71%
+
+Analyzing top contributors...
+
+Top 7 Contributors:
+1. Lukas Milieška: 12532 insertions, 6074 deletions, 160 commits, avg. files 4.01
+2. Rens Pols: 8115 insertions, 755 deletions, 139 commits, avg. files 1.42
+3. Sem van der Weijden: 5110 insertions, 2269 deletions, 76 commits, avg. files 2.86
+4. Eva Miesen: 4451 insertions, 2827 deletions, 107 commits, avg. files 2.07
+5. Wing Wong: 3870 insertions, 1927 deletions, 61 commits, avg. files 2.80
+6. Xiaoyu Du: 2918 insertions, 852 deletions, 79 commits, avg. files 1.87
+7. OOP Project Team: 1875 insertions, 226 deletions, 6 commits, avg. files 10.50
+```
+
 ## Features
 
 - Analyze contributors who frequently work on the same files.
