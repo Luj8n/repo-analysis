@@ -10,17 +10,15 @@ import fs from "fs";
  */
 async function main(): Promise<void> {
   // Define command line options using commander
+  program.name("repo-analysis").description("Analyze git repositories");
+
   program
     .requiredOption(
       "-r, --repository <REPOSITORY>",
       "link to the git repository. Example: https://github.com/Luj8n/oopp-team-25.git"
     )
-    .option(
-      "-t, --threshold [THRESHOLD]",
-      "specify threshold (from 0 to 1). Default = 0.6",
-      parseFloat,
-      0.6
-    );
+    .option("-t, --threshold <THRESHOLD>", "specify threshold from 0 to 1", parseFloat, 0.6)
+    .option("-l, --limit <LIMIT>", "amount of top contributors", (x) => parseInt(x), 5);
 
   program.parse();
 
@@ -28,6 +26,7 @@ async function main(): Promise<void> {
 
   const repository = options.repository;
   const threshold = options.threshold;
+  const limit = options.limit;
 
   try {
     // Cleanup any previous temporary files
@@ -49,7 +48,10 @@ async function main(): Promise<void> {
   processData(fileData);
 
   // Analyze the processed data to identify similarities between authors
-  analyzeData(fileData, authors, threshold);
+  analyzeSimilarities(fileData, authors, threshold);
+
+  // Identify top contributors
+  analyzeTopContributors(fileData, commits, limit);
 
   // Cleanup temporary files
   cleanup();
@@ -96,12 +98,14 @@ interface FileData {
   }[];
 }
 
+type Commits = LogResult<DefaultLogFields>;
+
 /**
  * Function to process commits and extract file data and authors.
- * @param {LogResult<DefaultLogFields>} commits - The commit history to process.
+ * @param {Commits} commits - The commit history to process.
  * @returns {{fileData: FileData, authors: string[]}} An object containing file data and authors.
  */
-function processCommits(commits: LogResult<DefaultLogFields>): {
+function processCommits(commits: Commits): {
   fileData: FileData;
   authors: string[];
 } {
@@ -199,7 +203,7 @@ function processData(fileData: FileData) {
  * @param {string[]} authors - The list of authors.
  * @param {number} threshold - The similarity threshold.
  */
-function analyzeData(fileData: FileData, authors: string[], threshold: number) {
+function analyzeSimilarities(fileData: FileData, authors: string[], threshold: number) {
   console.log("Analyzing data...");
 
   // Object to store developer data
@@ -230,6 +234,7 @@ function analyzeData(fileData: FileData, authors: string[], threshold: number) {
   }
 
   // Iterate over each pair of authors
+  console.log("\nSimilarities:");
   for (const a of authors) {
     let aWeightSum = Object.values(developerData[a]).reduce((a, c) => a + c, 0);
 
@@ -264,6 +269,66 @@ function analyzeData(fileData: FileData, authors: string[], threshold: number) {
       }
     }
   }
+  console.log();
+}
+
+/**
+ * Function to analyze data and identify top contributors.
+ * @param {FileData} fileData - The file data extracted from commits.
+ * @param {Commits} commits - All commits.
+ * @param {number} limit - The maximum number of top contributors to identify.
+ */
+function analyzeTopContributors(fileData: FileData, commits: Commits, limit: number) {
+  console.log("Analyzing top contributors...");
+
+  // Contributions of each author
+  const authorChanges: {
+    [author: string]: {
+      insertions: number;
+      deletions: number;
+      commits: number;
+    };
+  } = {};
+
+  // Sum up insertions and deletions of each author
+  for (const file in fileData) {
+    const commitData = fileData[file];
+    for (const commit of commitData) {
+      const author = commit.author;
+
+      // Increment the changes made by the author
+      if (!authorChanges[author])
+        authorChanges[author] = { insertions: 0, deletions: 0, commits: 0 };
+
+      authorChanges[author].insertions += commit.diff.insertions;
+      authorChanges[author].deletions += commit.diff.deletions;
+    }
+  }
+
+  // Count commits of each author
+  for (const commit of commits.all) {
+    const author = commit.author_name;
+    if (!authorChanges[author]) authorChanges[author] = { insertions: 0, deletions: 0, commits: 0 };
+    authorChanges[author].commits += 1;
+  }
+
+  // Sort authors by the total insertions in descending order
+  const sortedAuthors = Object.keys(authorChanges).sort(
+    (a, b) => authorChanges[b].insertions - authorChanges[a].insertions
+  );
+
+  // Output the top contributors
+  console.log(`\nTop ${limit} Contributors:`);
+  for (let i = 0; i < limit && i < sortedAuthors.length; i++) {
+    const author = sortedAuthors[i];
+    const contribution = authorChanges[author];
+    console.log(
+      `${i + 1}. ${author}: ${contribution.insertions} insertions, ${
+        contribution.deletions
+      } deletions, ${contribution.commits} commits`
+    );
+  }
+  console.log();
 }
 
 // Execute the main function
